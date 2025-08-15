@@ -77,7 +77,6 @@ public class SpringBootBatchMinimalApplication {
         return itemWriterBuilder
                 .name("userItemWriter")
                 .resource(new FileSystemResource("D:/WORKOUT/INTELLIJ_IDEA/2025/spring-boot-batch-demo/output-users.csv"))
-                .append(false)
                 .shouldDeleteIfExists(true)
                 .delimited()
                 .names("id", "name", "email")
