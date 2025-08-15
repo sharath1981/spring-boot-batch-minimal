@@ -7,9 +7,10 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.ItemProcessor;
-import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.FlatFileItemWriter;
 import org.springframework.batch.item.file.builder.FlatFileItemReaderBuilder;
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -17,8 +18,6 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
-
-import java.time.Duration;
 
 @SpringBootApplication
 public class SpringBootBatchMinimalApplication {
@@ -39,7 +38,7 @@ public class SpringBootBatchMinimalApplication {
     public Step step(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         final var stepBuilder = new StepBuilder("step", jobRepository);
         return stepBuilder.<User, User>chunk(600, transactionManager)
-//                .taskExecutor(new VirtualThreadTaskExecutor())
+                //.taskExecutor(new VirtualThreadTaskExecutor())
                 .taskExecutor(taskExecutor())  // performing better than VirtualThreadTaskExecutor
                 .reader(userReader())
                 .processor(userProcessor())
@@ -69,14 +68,20 @@ public class SpringBootBatchMinimalApplication {
 
     @Bean
     public ItemProcessor<User, User> userProcessor() {
-        return user -> {
-            Thread.sleep(Duration.ofMillis(1));
-            return new User(user.id(), user.name().toUpperCase(), user.email().toUpperCase());
-        };
+        return user -> new User(user.id(), user.name().toUpperCase(), user.email().toUpperCase());
     }
 
     @Bean
-    public ItemWriter<User> userWriter() {
-        return users -> users.forEach(System.out::println);
+    public FlatFileItemWriter<User> userWriter() {
+        final var itemWriterBuilder = new FlatFileItemWriterBuilder<User>();
+        return itemWriterBuilder
+                .name("userItemWriter")
+                .resource(new FileSystemResource("D:/WORKOUT/INTELLIJ_IDEA/2025/spring-boot-batch-demo/output-users.csv"))
+                .append(false)
+                .shouldDeleteIfExists(true)
+                .delimited()
+                .names("id", "name", "email")
+                .headerCallback(writer -> writer.write("ID,Name,Email"))
+                .build();
     }
 }
