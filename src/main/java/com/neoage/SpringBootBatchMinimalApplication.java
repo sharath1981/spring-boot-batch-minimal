@@ -18,13 +18,14 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.Duration;
+
 @SpringBootApplication
 public class SpringBootBatchMinimalApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(SpringBootBatchMinimalApplication.class, args);
     }
-
 
     @Bean
     public Job importUserJob(JobRepository jobRepository, Step step) {
@@ -37,13 +38,20 @@ public class SpringBootBatchMinimalApplication {
     @Bean
     public Step step(JobRepository jobRepository, PlatformTransactionManager transactionManager) {
         final var stepBuilder = new StepBuilder("step", jobRepository);
-        return stepBuilder.<User, User>chunk(6000, transactionManager)
+        return stepBuilder.<User, User>chunk(600, transactionManager)
 //                .taskExecutor(new VirtualThreadTaskExecutor())
                 .taskExecutor(taskExecutor())  // performing better than VirtualThreadTaskExecutor
                 .reader(userReader())
                 .processor(userProcessor())
                 .writer(userWriter())
                 .build();
+    }
+
+    @Bean
+    public TaskExecutor taskExecutor() {
+        final var asyncTaskExecutor = new SimpleAsyncTaskExecutor();
+        asyncTaskExecutor.setConcurrencyLimit(6);
+        return asyncTaskExecutor;
     }
 
     @Bean
@@ -61,19 +69,14 @@ public class SpringBootBatchMinimalApplication {
 
     @Bean
     public ItemProcessor<User, User> userProcessor() {
-        return user -> new User(user.id(), user.name().toUpperCase(), user.email().toUpperCase());
+        return user -> {
+            Thread.sleep(Duration.ofMillis(1));
+            return new User(user.id(), user.name().toUpperCase(), user.email().toUpperCase());
+        };
     }
 
     @Bean
     public ItemWriter<User> userWriter() {
         return users -> users.forEach(System.out::println);
     }
-
-    @Bean
-    public TaskExecutor taskExecutor() {
-        final var asyncTaskExecutor = new SimpleAsyncTaskExecutor();
-        asyncTaskExecutor.setConcurrencyLimit(6);
-        return asyncTaskExecutor;
-    }
-
 }
